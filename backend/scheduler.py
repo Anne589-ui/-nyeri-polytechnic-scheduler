@@ -1,4 +1,5 @@
 from itertools import product
+import random
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 TIME_SLOTS = [
@@ -44,11 +45,30 @@ def generate_timetable(courses, rooms, instructors):
     assignments = []
     unscheduled = []
 
+    # Build all possible slots and shuffle for even distribution
+    all_slots = list(product(DAYS, TIME_SLOTS, rooms))
+
     for idx, course in enumerate(courses):
         instructor = instructors[idx % len(instructors)]
         placed = False
 
-        for day, (start, end), room in product(DAYS, TIME_SLOTS, rooms):
+        # Shuffle slots so classes spread across all days
+        shuffled_slots = all_slots.copy()
+        random.shuffle(shuffled_slots)
+
+        # Sort by day index to prefer spreading across days
+        # but still randomize within each day
+        day_order = {day: i for i, day in enumerate(DAYS)}
+
+        # Count how many classes are already on each day
+        day_counts = {day: 0 for day in DAYS}
+        for a in assignments:
+            day_counts[a["day"]] += 1
+
+        # Sort slots preferring days with fewer classes
+        shuffled_slots.sort(key=lambda s: day_counts[s[0]])
+
+        for day, (start, end), room in shuffled_slots:
             if _is_slot_free(assignments, room.id, instructor.id,
                              day, start, end, course.name):
                 assignments.append({
@@ -67,6 +87,10 @@ def generate_timetable(courses, rooms, instructors):
                 "course": course.name,
                 "reason": f"No available slot found for {course.name}"
             })
+
+    # Sort final assignments by day then time
+    day_order = {day: i for i, day in enumerate(DAYS)}
+    assignments.sort(key=lambda a: (day_order[a["day"]], a["start_time"]))
 
     return {
         "scheduled": assignments,
