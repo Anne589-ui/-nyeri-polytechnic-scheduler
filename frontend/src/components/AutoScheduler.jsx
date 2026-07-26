@@ -2,137 +2,139 @@ import React, { useState } from "react";
 import { generateTimetable } from "../api";
 
 export default function AutoScheduler({ onGenerated }) {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult]   = useState(null);
-  const [error, setError]     = useState("");
-  const [confirm, setConfirm] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [result, setResult]       = useState(null);
+  const [error, setError]         = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
   const handleGenerate = async () => {
-    if (!confirm) {
-      setConfirm(true);
+    if (!confirmed) {
+      setConfirmed(true);
       return;
     }
     setLoading(true);
     setError("");
     setResult(null);
-    setConfirm(false);
+    setConfirmed(false);
     try {
       const data = await generateTimetable();
       setResult(data);
       onGenerated();
     } catch (e) {
-      setError(e.response?.data?.detail ?? "Failed to generate timetable.");
+      const status = e.response?.status ?? "";
+      const detail = e.response?.data?.detail ?? e.message ?? "Failed to generate timetable.";
+      setError(`${status ? "Error " + status + ": " : ""}${detail}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => setConfirm(false);
-
   return (
     <div style={styles.card}>
-
-      {/* Header */}
       <div style={styles.header}>
         <div>
-          <div style={styles.title}>⚡ Auto-Schedule</div>
-          <div style={styles.sub}>
-            Generates a full conflict-free timetable automatically using constraint satisfaction backtracking
-          </div>
-        </div>
-        {!confirm && (
-          <button
-            style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }}
-            onClick={handleGenerate}
-            disabled={loading}
-          >
-            {loading ? "Generating…" : "Generate Timetable"}
-          </button>
-        )}
-      </div>
-
-      {/* Constraints info */}
-      <div style={styles.constraints}>
-        <span style={styles.constraint}>✓ No room double-booking</span>
-        <span style={styles.constraint}>✓ No instructor clash</span>
-        <span style={styles.constraint}>✓ No course repeated same day</span>
-        <span style={styles.constraint}>✓ Room capacity respected</span>
-      </div>
-
-      {/* Confirm warning */}
-      {confirm && (
-        <div style={styles.confirmBox}>
-          <p style={styles.confirmText}>
-            ⚠ This will <strong>clear the current timetable</strong> and generate a new one.
-            Are you sure?
+          <p style={styles.title}>⚡ Auto-Generate Timetable</p>
+          <p style={styles.sub}>
+            Constraint satisfaction algorithm — generates a fully conflict-free
+            schedule from your courses, rooms and instructors.
           </p>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button style={styles.confirmBtn} onClick={handleGenerate}>
-              Yes, generate new timetable
-            </button>
-            <button style={styles.cancelBtn} onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
         </div>
-      )}
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
+          style={{
+            ...styles.btn,
+            background: confirmed ? "#a32d2d" : "#085041",
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading
+            ? "Generating…"
+            : confirmed
+            ? "⚠ Confirm — clears existing timetable"
+            : "⚡ Generate timetable"}
+        </button>
+      </div>
 
-      {/* Error */}
       {error && (
-        <div style={styles.errorBox}>
-          ⚠ {error}
+        <div style={styles.errorBox}>⚠ {error}</div>
+      )}
+
+      {confirmed && !loading && (
+        <div style={styles.warnBox}>
+          ⚠ This will <strong>clear the existing timetable</strong> and replace
+          it with a new auto-generated one. Click the button again to confirm.
         </div>
       )}
 
-      {/* Success result */}
       {result && (
-        <div style={styles.successBox}>
-          <div style={styles.successTitle}>
-            ✓ {result.message}
+        <div style={styles.resultBox}>
+          <div style={styles.statsRow}>
+            <Stat label="Total courses" value={result.stats?.total ?? 0} />
+            <Stat label="Scheduled"     value={result.stats?.scheduled ?? 0}   color="#085041" />
+            <Stat label="Not placed"    value={result.stats?.unscheduled ?? 0} color={(result.stats?.unscheduled ?? 0) > 0 ? "#a32d2d" : "#085041"} />
           </div>
-          <div style={styles.resultGrid}>
-            {["Monday","Tuesday","Wednesday","Thursday","Friday"].map(day => {
-              const dayClasses = result.assignments.filter(a => a.day === day);
-              if (dayClasses.length === 0) return null;
-              return (
-                <div key={day} style={styles.dayCard}>
-                  <div style={styles.dayTitle}>{day}</div>
-                  {dayClasses.map((a, i) => (
-                    <div key={i} style={styles.classItem}>
-                      <span style={styles.courseName}>{a.course_name}</span>
-                      <span style={styles.classDetail}>{a.start_time}–{a.end_time}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+
+          <p style={styles.message}>✓ {result.message}</p>
+
+          {Array.isArray(result.unscheduled) && result.unscheduled.length > 0 && (
+            <div style={styles.unscheduledBox}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "#a32d2d", marginBottom: 6 }}>
+                Could not schedule:
+              </p>
+              {result.unscheduled.map((u, i) => (
+                <p key={i} style={{ fontSize: 12, color: "#a32d2d", marginBottom: 3 }}>
+                  • {u.course ?? u} — {u.reason ?? ""}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {Array.isArray(result.scheduled) && result.scheduled.length > 0 && (
+            <div style={styles.preview}>
+              <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#333" }}>
+                Generated schedule preview ({result.scheduled.length} classes):
+              </p>
+              <div style={{ maxHeight: 180, overflowY: "auto" }}>
+                {result.scheduled.map((c, i) => (
+                  <div key={i} style={styles.previewRow}>
+                    <span style={styles.courseBadge}>{c.course}</span>
+                    <span style={styles.detail}>{c.day}</span>
+                    <span style={styles.detail}>{c.start_time}–{c.end_time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
 
+function Stat({ label, value, color }) {
+  return (
+    <div style={{ textAlign: "center", background: "#f5f5f5", borderRadius: 8, padding: "10px 16px" }}>
+      <div style={{ fontSize: 22, fontWeight: 500, color: color ?? "#111" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{label}</div>
     </div>
   );
 }
 
 const styles = {
-  card:        { background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 24 },
-  header:      { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-  title:       { fontSize: 15, fontWeight: 600, marginBottom: 4, color: "var(--color-text-primary)" },
-  sub:         { fontSize: 12, color: "var(--color-text-secondary)", maxWidth: 500 },
-  btn:         { height: 38, padding: "0 20px", background: "#085041", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" },
-  constraints: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 4 },
-  constraint:  { fontSize: 11, color: "#1a6640", background: "#f0faf4", padding: "3px 10px", borderRadius: 12, border: "0.5px solid #b7dfca" },
-  confirmBox:  { background: "#fffbe6", border: "1px solid #ffe066", borderRadius: 8, padding: "12px 14px", marginTop: 12 },
-  confirmText: { fontSize: 13, color: "#7a5c00", margin: 0 },
-  confirmBtn:  { height: 34, padding: "0 16px", background: "#085041", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: "pointer" },
-  cancelBtn:   { height: 34, padding: "0 16px", background: "transparent", color: "var(--color-text-secondary)", border: "1px solid #ddd", borderRadius: 7, fontSize: 12, cursor: "pointer" },
-  errorBox:    { background: "#fff5f5", border: "1px solid #f5c0c0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#a32d2d", marginTop: 12 },
-  successBox:  { background: "#f0faf4", border: "1px solid #b7dfca", borderRadius: 8, padding: "12px 14px", marginTop: 12 },
-  successTitle:{ fontSize: 13, fontWeight: 600, color: "#1a6640", marginBottom: 12 },
-  resultGrid:  { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 },
-  dayCard:     { background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 10px" },
-  dayTitle:    { fontSize: 11, fontWeight: 600, color: "#085041", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" },
-  classItem:   { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0", borderTop: "0.5px solid #f0f0f0", fontSize: 11 },
-  courseName:  { color: "var(--color-text-primary)", fontWeight: 500 },
-  classDetail: { color: "var(--color-text-secondary)" },
+  card:           { background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 24 },
+  header:         { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 12 },
+  title:          { fontSize: 14, fontWeight: 600, margin: "0 0 4px", color: "#111" },
+  sub:            { fontSize: 12, color: "#888", margin: 0, maxWidth: 480 },
+  btn:            { height: 40, padding: "0 18px", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" },
+  errorBox:       { background: "#fff5f5", border: "1px solid #f5c0c0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#a32d2d", marginTop: 8 },
+  warnBox:        { background: "#fffbe6", border: "1px solid #ffe066", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#7a5c00", marginTop: 8 },
+  resultBox:      { marginTop: 14, borderTop: "1px solid #f0f0f0", paddingTop: 14 },
+  statsRow:       { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 },
+  message:        { fontSize: 13, color: "#085041", fontWeight: 500, marginBottom: 10 },
+  unscheduledBox: { background: "#fff5f5", border: "1px solid #f5c0c0", borderRadius: 8, padding: "10px 14px", marginBottom: 12 },
+  preview:        { background: "#f7f7f7", borderRadius: 8, padding: "10px 14px" },
+  previewRow:     { display: "flex", gap: 12, alignItems: "center", padding: "4px 0", borderBottom: "1px solid #eee", fontSize: 12 },
+  courseBadge:    { background: "#E1F5EE", color: "#085041", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 500, minWidth: 120 },
+  detail:         { color: "#888", minWidth: 80 },
 };
