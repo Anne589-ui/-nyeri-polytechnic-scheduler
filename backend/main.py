@@ -263,17 +263,19 @@ def auto_generate(
     instructors = crud.get_instructors(db)
 
     if not courses:
-        raise HTTPException(status_code=400, detail="No courses found. Add courses first.")
+        raise HTTPException(status_code=400, detail="No courses found. Add courses first in the Manage tab.")
     if not rooms:
-        raise HTTPException(status_code=400, detail="No rooms found. Add rooms first.")
+        raise HTTPException(status_code=400, detail="No rooms found. Add rooms first in the Manage tab.")
     if not instructors:
-        raise HTTPException(status_code=400, detail="No instructors found. Add instructors first.")
+        raise HTTPException(status_code=400, detail="No instructors found. Add instructors first in the Manage tab.")
 
     result = generate_timetable(courses, rooms, instructors)
 
+    # Clear existing timetable
     db.query(models.ScheduledClass).delete()
     db.commit()
 
+    # Save new assignments
     saved = []
     for item in result["scheduled"]:
         obj = models.ScheduledClass(**item)
