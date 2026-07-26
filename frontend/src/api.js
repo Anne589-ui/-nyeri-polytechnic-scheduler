@@ -53,4 +53,4 @@ export const deleteClass    = (id) => api.delete(`/classes/${id}`).then(r => r.d
 // Clashes
 export const getClashes     = () => api.get("/clashes").then(r => r.data);
 // Auto-generate timetable
-export const generateTimetable = () => api.post("/timetable/generate").then(r => r.data);
+export const generateTimetable = () => api.post("/schedule/generate").then(r => r.data);
