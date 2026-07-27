@@ -66,7 +66,7 @@ export default function App() {
         <div style={styles.navLeft}>
           <span style={{ fontSize: 26 }}>🏫</span>
           <div>
-            <div style={styles.navTitle}>Nyeri Polytechnic</div>
+            <div style={styles.navTitle}>Nyeri university</div>
             <div style={styles.navSub}>Scheduling Engine</div>
           </div>
         </div>

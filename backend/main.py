@@ -82,7 +82,7 @@ auto_seed()
 
 
 app = FastAPI(
-    title="Nyeri Polytechnic Scheduler",
+    title="Nyeri polytechnic Scheduler",
     version="2.0.0",
     swagger_ui_parameters={"persistAuthorization": True},
 )
